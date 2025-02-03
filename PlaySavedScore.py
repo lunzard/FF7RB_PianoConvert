@@ -33,23 +33,40 @@ with open("midi_events.txt", "r") as file:
             "down": down_keys,
             "up": up_keys
         }
-    # events_dict = dict(sorted(events_dict.keys()))
+
+# Sort events by timestamp
+sorted_events = sorted(events_dict.items(), key=lambda x: x[0])
 
 print("Starting MIDI Playback in 3s...")
 time.sleep(3)
 
 # Track the start time to process events at correct times
-start_time = time.time()
+start_time = time.perf_counter()
+
+# Track currently pressed keys
+currently_pressed_keys = set()
 
 # Process the events based on their time
-for event_time, events in events_dict.items():
-    sleep_time = max(0, event_time - (time.time() - start_time))
+for event_time, events in sorted_events:
+    # Calculate sleep time
+    sleep_time = max(0, event_time - (time.perf_counter() - start_time))
     if sleep_time > 0:
         time.sleep(sleep_time)  # Wait until the correct time
+    
+    # Release keys first
     for key_up in events['up']:
-         pyautogui.keyUp(key_up)
+        if key_up in currently_pressed_keys:
+            pyautogui.keyUp(key_up)
+            currently_pressed_keys.remove(key_up)
+    
+    # Press keys next
     for key_down in events['down']:
-        pyautogui.keyDown(key_down)
+        if key_down not in currently_pressed_keys:
+            pyautogui.keyDown(key_down)
+            currently_pressed_keys.add(key_down)
 
+# Release any remaining keys at the end
+for key in currently_pressed_keys:
+    pyautogui.keyUp(key)
 
 print("MIDI Playback Complete.")

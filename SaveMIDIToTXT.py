@@ -1,6 +1,4 @@
 import mido
-import pyautogui
-import time
 import os
 from collections import defaultdict
 
@@ -44,8 +42,8 @@ MIDI_TO_KEY = {
 }
 
 # Load MIDI file
-midi_folder_path = os.getcwd() +os.sep+ "midi"
-midi_file = os.listdir(os.getcwd() + os.sep + "midi")[0]
+midi_folder_path = os.getcwd() + os.sep + "midi"
+midi_file = os.listdir(midi_folder_path)[0]
 midi = mido.MidiFile(midi_folder_path + os.sep + midi_file)
 
 # Dictionary to store key events grouped by current_time
@@ -53,18 +51,30 @@ key_events_dict = defaultdict(list)
 # Track the current time in the MIDI file (relative time)
 current_time = 0
 
+# Track active notes to ensure proper keyUp events
+active_notes = {}
+
 # Iterate through all MIDI messages
 for msg in midi:
     current_time += msg.time  # Update current time based on the message's time
+
     if msg.type == "note_on" and msg.velocity > 0:
+        # Note is pressed (keyDown)
         if msg.note in MIDI_TO_KEY:
             key = MIDI_TO_KEY[msg.note]
             key_events_dict[current_time].append(('down', key))
+            # Track the note as active
+            active_notes[msg.note] = current_time
 
     elif msg.type == "note_off" or (msg.type == "note_on" and msg.velocity == 0):
+        # Note is released (keyUp)
         if msg.note in MIDI_TO_KEY:
             key = MIDI_TO_KEY[msg.note]
-            key_events_dict[current_time].append(('up', key))
+            # Ensure the note was previously pressed
+            if msg.note in active_notes:
+                key_events_dict[current_time].append(('up', key))
+                # Remove the note from active notes
+                del active_notes[msg.note]
 
 # Sort events by current_time
 sorted_key_events = sorted(key_events_dict.items())  # [(time, [(action, key), ...])]
